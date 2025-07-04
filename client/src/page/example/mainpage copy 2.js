@@ -13,9 +13,9 @@ import { saveAs } from "file-saver"; // Import saveAs from file-saver
 function QuestionView() {
   const initialData = [];
   const [questionDetails, setQuestionDetails] = useState(initialData);
-  const [questionDetailsRejected, setRejectedQuestions] = useState(0);
-  const contentRef = useRef();
-  const tempRef = useRef();
+  const [questionDetailsRejected, setRejectedQuestions] = useState(0); // This state isn't used in the provided code, consider removing if not needed.
+  const contentRef = useRef(); // This ref isn't directly used for PDF generation in the new logic, consider removing if not needed.
+  const tempRef = useRef(); // This ref isn't used in the provided code, consider removing if not needed.
 
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -91,20 +91,29 @@ function QuestionView() {
       setQuestionDetails([]);
     }
   };
+
+  // Corrected sanitizedHTML_download function
   const sanitizedHTML_download = (html) => {
     if (typeof html !== "string") {
-      console.warn("sanitizedHTML received non-string input:", html);
+      console.warn("sanitizedHTML_download received non-string input:", html);
       return ""; // Return empty string for invalid input
     }
     const div = document.createElement("div");
     div.innerHTML = html;
-    // Basic sanitization: remove script tags and event attributes
+
+    // Remove script tags
     Array.from(div.querySelectorAll("script")).forEach((script) =>
       script.remove()
     );
-    Array.from(div.querySelectorAll("[*on*]")).forEach((el) => {
-      for (const attr of Array.from(el.attributes)) {
+
+    // Corrected: Iterate through all elements and then their attributes to remove event handlers
+    const allElements = div.querySelectorAll("*"); // Select all elements
+    allElements.forEach((el) => {
+      // Loop backwards to safely remove attributes during iteration
+      for (let i = el.attributes.length - 1; i >= 0; i--) {
+        const attr = el.attributes[i];
         if (attr.name.startsWith("on")) {
+          // Check if attribute name starts with "on" (e.g., onclick, onload)
           el.removeAttribute(attr.name);
         }
       }
@@ -175,18 +184,17 @@ function QuestionView() {
     const contentWidth = pageWidth - margin * 2;
     const questionSpacing = 10; // Vertical space between questions
 
-    // Create a single temporary div for all measurements and rendering
     const tempDiv = document.createElement("div");
     tempDiv.style.width = `${contentWidth}mm`;
     tempDiv.style.position = "absolute";
     tempDiv.style.left = "-9999px";
-    tempDiv.style.visibility = "hidden"; // Keep it hidden
-    tempDiv.style.boxSizing = "border-box"; // Important for consistent box model
+    tempDiv.style.visibility = "hidden";
+    tempDiv.style.boxSizing = "border-box";
     document.body.appendChild(tempDiv);
 
     try {
       let currentPageHTML = "";
-      let currentYOffset = margin; // Tracks the Y position for content on the current PDF page
+      let currentYOffset = margin;
 
       // --- 1. Measure and add Header to the first page ---
       const headerHtml = `
@@ -207,7 +215,6 @@ function QuestionView() {
       <div style="height: 10px;"></div>`;
 
       tempDiv.innerHTML = headerHtml;
-      // Wait for header images to load before measuring
       await Promise.all(
         Array.from(tempDiv.getElementsByTagName("img")).map((img) => {
           if (img.complete) return Promise.resolve();
@@ -218,9 +225,8 @@ function QuestionView() {
       );
       const headerHeight = tempDiv.offsetHeight;
 
-      // Add header to the first PDF page
       const headerCanvas = await html2canvas(tempDiv, {
-        scale: 2, // Higher scale for better quality
+        scale: 2,
         useCORS: true,
         scrollY: 0,
         windowWidth: tempDiv.scrollWidth,
@@ -240,10 +246,9 @@ function QuestionView() {
         headerImgRenderHeight
       );
 
-      currentYOffset += headerImgRenderHeight; // Update Y offset for content below header
+      currentYOffset += headerImgRenderHeight;
 
       // --- 2. Pre-measure all questions' heights ---
-      // This optimization avoids re-rendering the tempDiv for each question measurement in the main loop
       const measuredQuestions = [];
       for (let i = 0; i < questionDetails.length; i++) {
         const q = questionDetails[i];
@@ -286,7 +291,7 @@ function QuestionView() {
           </tbody>
         </table>`;
 
-        tempDiv.innerHTML = questionHtmlSnippet; // Put only this question's HTML for measurement
+        tempDiv.innerHTML = questionHtmlSnippet;
         await Promise.all(
           Array.from(tempDiv.getElementsByTagName("img")).map((img) => {
             if (img.complete) return Promise.resolve();
@@ -303,25 +308,22 @@ function QuestionView() {
         });
       }
 
-      // Clear tempDiv after pre-measurement to prepare for page rendering
-      tempDiv.innerHTML = "";
+      tempDiv.innerHTML = ""; // Clear tempDiv after pre-measurement
 
       // --- 3. Iterate through pre-measured questions to build pages ---
       for (let i = 0; i < measuredQuestions.length; i++) {
         const q = measuredQuestions[i];
-        const questionRenderedHeight = q.height; // Use pre-measured height
+        const questionRenderedHeight = q.height;
 
         // Check if adding this question exceeds the remaining page height
-        // (pageHeight - margin) is the effective bottom boundary for content
         if (
           currentYOffset + questionRenderedHeight + questionSpacing >
           pageHeight - margin
         ) {
-          // Current question does not fit, so render the accumulated HTML for the current page
-          tempDiv.innerHTML = currentPageHTML; // Put all accumulated HTML for the current page
+          // Render the accumulated HTML for the current page
+          tempDiv.innerHTML = currentPageHTML;
 
           await Promise.all(
-            // Wait for images in the accumulated page content
             Array.from(tempDiv.getElementsByTagName("img")).map((img) => {
               if (img.complete) return Promise.resolve();
               return new Promise((resolve) => {
@@ -344,33 +346,28 @@ function QuestionView() {
           const pageImgRenderHeight =
             (pageCanvas.height * contentWidth) / pageCanvas.width;
 
-          // Add this content to the previous page (current PDF page)
-          // Adjust Y position if the content starts below the header
           pdf.addImage(
             pageImgData,
             "PNG",
             margin,
-            currentYOffset - pageImgRenderHeight, // Adjust Y to place it correctly on the current page
+            currentYOffset - pageImgRenderHeight,
             contentWidth,
             pageImgRenderHeight
           );
 
-          // Start a new page in the PDF
           pdf.addPage();
-          currentPageHTML = ""; // Reset HTML buffer for the new page
-          currentYOffset = margin; // Reset Y offset for new page (account for top margin)
+          currentPageHTML = "";
+          currentYOffset = margin;
         }
 
-        // Add the current question's HTML to the buffer for the current page
         currentPageHTML += q.html;
-        currentYOffset += questionRenderedHeight + questionSpacing; // Update Y offset for the next question
+        currentYOffset += questionRenderedHeight + questionSpacing;
       }
 
       // --- 4. Render any remaining content on the last page ---
       if (currentPageHTML.length > 0) {
         tempDiv.innerHTML = currentPageHTML;
         await Promise.all(
-          // Wait for images in the final page content
           Array.from(tempDiv.getElementsByTagName("img")).map((img) => {
             if (img.complete) return Promise.resolve();
             return new Promise((resolve) => {
@@ -397,381 +394,30 @@ function QuestionView() {
           pageImgData,
           "PNG",
           margin,
-          currentYOffset - pageImgRenderHeight, // Adjust Y to place it correctly
+          currentYOffset - pageImgRenderHeight,
           contentWidth,
           pageImgRenderHeight
         );
       }
 
-      // --- 5. Ensure the PDF is downloaded ---
       const pdfBlob = pdf.output("blob");
-      saveAs(pdfBlob, `${courseCode}_Questions.pdf`); // Use file-saver for reliable download
-
-      return pdfBlob; // Return the blob if needed by calling function
+      return pdfBlob;
     } catch (error) {
       console.error(
         `Error in generatePdfBlobForCourse for ${courseCode}:`,
         error
       );
-      // Re-throw the error with a more descriptive message if possible
       throw new Error(`PDF generation failed: ${error.message || error}`);
     } finally {
-      // Ensure the tempDiv is removed from the DOM regardless of success or failure
       if (tempDiv && tempDiv.parentNode) {
         document.body.removeChild(tempDiv);
       }
     }
   };
-  // const generatePdfBlobForCourse = async (questionDetails, courseCode) => {
-  //   try {
-  //     const pdf = new jsPDF("p", "mm", "a4");
-  //     const pageHeight = pdf.internal.pageSize.getHeight();
-  //     const pageWidth = pdf.internal.pageSize.getWidth();
-  //     const margin = 15;
-  //     const contentWidth = pageWidth - margin * 2;
-
-  //     const tempDiv = document.createElement("div");
-  //     tempDiv.style.width = `${contentWidth}mm`;
-  //     tempDiv.style.position = "absolute";
-  //     tempDiv.style.left = "-9999px";
-  //     tempDiv.style.visibility = "hidden"; // Use visibility hidden instead of just left to ensure layout calculation
-  //     document.body.appendChild(tempDiv);
-
-  //     let currentPageContentHeight = 0;
-  //     let questionsAddedToCurrentPage = 0;
-  //     let currentPageIndex = 0;
-
-  //     // Add header to the first page
-  //     let headerHTML = `
-  //     <table class="qp-header-table" style="width: 100%; border-collapse: collapse;">
-  //       <tbody>
-  //         <tr>
-  //           <td class="header-logo-cell" style="width: 20%; text-align: center; padding: 10px;">
-  //             <img src="${Logo}" width="100" alt="Logo" style="max-width: 100px; height: auto;"/>
-  //           </td>
-  //           <td class="header-text-cell" style="width: 80%; text-align: center; padding: 10px;">
-  //             <h3 style="margin: 0; font-size: 16px;">BANNARI AMMAN INSTITUTE OF TECHNOLOGY</h3>
-  //             <h3 style="margin: 5px 0; font-size: 14px;">(An Autonomous Institution)</h3>
-  //             <h3 style="margin: 0; font-size: 12px;">SATHYAMANGALAM - 638 401</h3>
-  //           </td>
-  //         </tr>
-  //       </tbody>
-  //     </table>
-  //     <div style="height: 10px;"></div>`;
-
-  //     tempDiv.innerHTML = headerHTML;
-  //     // Wait for images in the header to load before measuring
-  //     await Promise.all(
-  //       Array.from(tempDiv.getElementsByTagName("img")).map((img) => {
-  //         if (img.complete) return Promise.resolve();
-  //         return new Promise((resolve) => {
-  //           img.onload = img.onerror = resolve;
-  //         });
-  //       })
-  //     );
-  //     const headerHeight = tempDiv.offsetHeight;
-  //     currentPageContentHeight += headerHeight;
-
-  //     // Add header to PDF
-  //     const headerCanvas = await html2canvas(tempDiv, {
-  //       scale: 1,
-  //       useCORS: true,
-  //       scrollY: -window.scrollY,
-  //       windowWidth: tempDiv.scrollWidth,
-  //       windowHeight: tempDiv.scrollHeight,
-  //     });
-  //     const headerImgData = headerCanvas.toDataURL("image/png");
-  //     const headerImgHeight =
-  //       (headerCanvas.height * contentWidth) / headerCanvas.width;
-  //     pdf.addImage(
-  //       headerImgData,
-  //       "PNG",
-  //       margin,
-  //       margin,
-  //       contentWidth,
-  //       headerImgHeight
-  //     );
-
-  //     for (let i = 0; i < questionDetails.length; i++) {
-  //       const q = questionDetails[i];
-  //       const questionNumber = i + 1;
-
-  //       // Construct the HTML for the current question
-  //       const questionHTML = `
-  //       <table class="qp-questions-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px; page-break-inside: avoid;">
-  //         <tbody>
-  //           <tr class="question-row">
-  //             <td class="qp-cell-a-number" style="width: 10%; vertical-align: top; padding: 5px; border: 1px solid #eee; font-weight: bold;">
-  //               A${questionNumber}
-  //             </td>
-  //             <td class="qp-cell-sub-q" style="width: 5%; vertical-align: top; padding: 5px; border: 1px solid #eee;">(i)</td>
-  //             <td class="qp-cell-question-content" style="width: 85%; padding: 5px; border: 1px solid #eee;">
-  //               <div class="sanitized-content">${sanitizedHTML(
-  //                 q.question
-  //               )}</div>
-  //               ${
-  //                 q.topic
-  //                   ? `<h1 class="topic-heading" style="font-size: 10px; margin-top: 5px; margin-bottom: 2px;">Topic</h1><h3 class="font-medium" style="font-size: 12px; margin: 0;">${q.topic}</h3>`
-  //                   : ""
-  //               }
-  //               <div class="mark-section" style="text-align: right; margin-top: 5px;">
-  //                 <h2 class="mark-text" style="font-size: 12px; margin: 0;">
-  //                   ${q.course_co} - ${q.co_part} (${q.mark})<br />${
-  //         q.cognitive
-  //       }
-  //                 </h2>
-  //               </div>
-  //             </td>
-  //           </tr>
-  //           <tr class="answer-row">
-  //             <td colspan="2" style="vertical-align: top; padding: 5px; border: 1px solid #eee; font-weight: bold;">Answer</td>
-  //             <td style="width: 85%; padding: 5px; border: 1px solid #eee;">
-  //               <div class="sanitized-content answer-text">${sanitizedHTML(
-  //                 q.answer || "Answer not available."
-  //               )}</div>
-  //             </td>
-  //           </tr>
-  //         </tbody>
-  //       </table>`;
-
-  //       // Temporarily add the current question HTML to the tempDiv to measure its height
-  //       tempDiv.innerHTML = questionHTML;
-  //       await Promise.all(
-  //         Array.from(tempDiv.getElementsByTagName("img")).map((img) => {
-  //           if (img.complete) return Promise.resolve();
-  //           return new Promise((resolve) => {
-  //             img.onload = img.onerror = resolve;
-  //           });
-  //         })
-  //       );
-  //       const questionHeight = tempDiv.offsetHeight; // Get the rendered height of the question
-
-  //       // Check if adding this question exceeds the page height
-  //       // Account for margins when checking available space
-  //       if (currentPageContentHeight + questionHeight + margin > pageHeight) {
-  //         // If it overflows, render the current page content and start a new page
-  //         const currentPageCanvas = await html2canvas(tempDiv.parentNode, {
-  //           // Capture content excluding the overflowed part if possible
-  //           scale: 1,
-  //           useCORS: true,
-  //           scrollY: -window.scrollY,
-  //           windowWidth: tempDiv.scrollWidth,
-  //           windowHeight: tempDiv.scrollHeight,
-  //         });
-
-  //         const currentPageImgData = currentPageCanvas.toDataURL("image/png");
-  //         const currentPageImgHeight =
-  //           (currentPageCanvas.height * contentWidth) / currentPageCanvas.width;
-
-  //         // Before adding the next page, we need to add the content that *did* fit on the current page.
-  //         // This is tricky with html2canvas because it renders the entire `tempDiv`.
-  //         // A better approach would be to manage the `pageHTML` string and render it.
-  //         // Let's refactor to build up `pageHTML` for each page and then render it.
-
-  //         pdf.addPage();
-  //         currentPageIndex++;
-  //         currentPageContentHeight = 0; // Reset content height for the new page
-  //         questionsAddedToCurrentPage = 0; // Reset question count for the new page
-  //       }
-
-  //       // Append the current question to the tempDiv's existing content for the current page
-  //       // This is where the original approach becomes difficult for dynamic content.
-  //       // Instead of appending to tempDiv and re-rendering, let's keep track of accumulated HTML
-  //       // and render when a page break is needed.
-
-  //       // To simplify, let's assume we render the accumulated questions for the current page
-  //       // when a new page is added, or at the end.
-  //       // For now, let's just render each question individually to measure and then add to PDF.
-
-  //       // If the question fits, add it to the current page
-  //       // The image addition needs to happen after we decide a page break.
-  //       // Let's accumulate the HTML for the current page, and then render it when a page break is needed.
-  //       // Or, alternatively, we can add each question as a separate image.
-
-  //       const questionCanvas = await html2canvas(tempDiv, {
-  //         // Render only the current question's HTML
-  //         scale: 1,
-  //         useCORS: true,
-  //         scrollY: -window.scrollY,
-  //         windowWidth: tempDiv.scrollWidth,
-  //         windowHeight: tempDiv.scrollHeight,
-  //       });
-  //       const questionImgData = questionCanvas.toDataURL("image/png");
-  //       const questionImgHeight =
-  //         (questionCanvas.height * contentWidth) / questionCanvas.width;
-
-  //       pdf.addImage(
-  //         questionImgData,
-  //         "PNG",
-  //         margin,
-  //         margin + currentPageContentHeight,
-  //         contentWidth,
-  //         questionImgHeight
-  //       );
-  //       currentPageContentHeight += questionImgHeight + 10; // Add some padding between questions
-
-  //       questionsAddedToCurrentPage++;
-  //     }
-
-  //     // Return the PDF as a Blob
-  //     const pdfBlob = pdf.output("blob");
-  //     document.body.removeChild(tempDiv); // Clean up temp div after use
-  //     return pdfBlob;
-  //   } catch (error) {
-  //     console.error(
-  //       `Error in generatePdfBlobForCourse for ${courseCode}:`,
-  //       error
-  //     );
-  //     // Ensure the tempDiv is removed even if an error occurs
-  //     const tempDiv = document.querySelector(
-  //       "div[style*='-9999px'], div[style*='visibility: hidden']"
-  //     );
-  //     if (tempDiv) {
-  //       document.body.removeChild(tempDiv);
-  //     }
-  //     throw error;
-  //   }
-  // };
-  // const generatePdfBlobForCourse = async (questionDetails, courseCode) => {
-  //   try {
-  //     const pdf = new jsPDF("p", "mm", "a4");
-  //     const pageHeight = pdf.internal.pageSize.getHeight();
-  //     const pageWidth = pdf.internal.pageSize.getWidth();
-  //     const margin = 15;
-  //     const contentWidth = pageWidth - margin * 2;
-  //     const questionsPerPage = 3;
-  //     const numPages = Math.ceil(questionDetails.length / questionsPerPage);
-
-  //     const tempDiv = document.createElement("div");
-  //     tempDiv.style.width = `${contentWidth}mm`;
-  //     tempDiv.style.position = "absolute";
-  //     tempDiv.style.left = "-9999px";
-  //     tempDiv.style.bottom = "-9999px";
-  //     document.body.appendChild(tempDiv);
-
-  //     for (let p = 0; p < numPages; p++) {
-  //       if (p > 0) {
-  //         pdf.addPage();
-  //       }
-
-  //       let pageHTML = "";
-
-  //       if (p === 0) {
-  //         pageHTML += `
-  //           <table class="qp-header-table" style="width: 100%; border-collapse: collapse;">
-  //               <tbody>
-  //                   <tr>
-  //                       <td class="header-logo-cell" style="width: 20%; text-align: center; padding: 10px;">
-  //                           <img src="${Logo}" width="100" alt="Logo" style="max-width: 100px; height: auto;"/>
-  //                       </td>
-  //                       <td class="header-text-cell" style="width: 80%; text-align: center; padding: 10px;">
-  //                           <h3 style="margin: 0; font-size: 16px;">BANNARI AMMAN INSTITUTE OF TECHNOLOGY</h3>
-  //                           <h3 style="margin: 5px 0; font-size: 14px;">(An Autonomous Institution)</h3>
-  //                           <h3 style="margin: 0; font-size: 12px;">SATHYAMANGALAM - 638 401</h3>
-  //                       </td>
-  //                   </tr>
-  //               </tbody>
-  //           </table>
-  //           <div style="height: 10px;"></div>`;
-  //       }
-
-  //       const startIndex = p * questionsPerPage;
-  //       const endIndex = startIndex + questionsPerPage;
-  //       const pageQuestions = questionDetails.slice(startIndex, endIndex);
-
-  //       pageQuestions.forEach((q, index) => {
-  //         const questionNumber = startIndex + index + 1;
-  //         pageHTML += `
-  //           <table class="qp-questions-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px; page-break-inside: avoid;">
-  //               <tbody>
-  //                   <tr class="question-row">
-  //                       <td class="qp-cell-a-number" style="width: 10%; vertical-align: top; padding: 5px; border: 1px solid #eee; font-weight: bold;">
-  //                           A${questionNumber}
-  //                       </td>
-  //                       <td class="qp-cell-sub-q" style="width: 5%; vertical-align: top; padding: 5px; border: 1px solid #eee;">(i)</td>
-  //                       <td class="qp-cell-question-content" style="width: 85%; padding: 5px; border: 1px solid #eee;">
-  //                           <div class="sanitized-content">${sanitizedHTML(
-  //                             q.question
-  //                           )}</div>
-  //                           ${
-  //                             q.topic
-  //                               ? `<h1 class="topic-heading" style="font-size: 10px; margin-top: 5px; margin-bottom: 2px;">Topic</h1><h3 class="font-medium" style="font-size: 12px; margin: 0;">${q.topic}</h3>`
-  //                               : ""
-  //                           }
-  //                           <div class="mark-section" style="text-align: right; margin-top: 5px;">
-  //                               <h2 class="mark-text" style="font-size: 12px; margin: 0;">
-  //                                   ${q.course_co} - ${q.co_part} (${
-  //           q.mark
-  //         })<br />${q.cognitive}
-  //                               </h2>
-  //                           </div>
-  //                       </td>
-  //                   </tr>
-  //                   <tr class="answer-row">
-  //                       <td colspan="2" style="vertical-align: top; padding: 5px; border: 1px solid #eee; font-weight: bold;">Answer</td>
-  //                       <td style="width: 85%; padding: 5px; border: 1px solid #eee;">
-  //                           <div class="sanitized-content answer-text">${sanitizedHTML(
-  //                             q.answer || "Answer not available."
-  //                           )}</div>
-  //                       </td>
-  //                   </tr>
-  //               </tbody>
-  //           </table>`;
-  //       });
-
-  //       tempDiv.innerHTML = pageHTML;
-
-  //       await Promise.all(
-  //         Array.from(tempDiv.getElementsByTagName("img")).map((img) => {
-  //           if (img.complete) return Promise.resolve();
-  //           return new Promise((resolve) => {
-  //             img.onload = img.onerror = resolve;
-  //           });
-  //         })
-  //       );
-
-  //       const canvas = await html2canvas(tempDiv, {
-  //         scale: 1,
-  //         useCORS: true,
-  //         scrollY: -window.scrollY,
-  //         windowWidth: tempDiv.scrollWidth,
-  //         windowHeight: tempDiv.scrollHeight,
-  //       });
-  //       const imgData = canvas.toDataURL("image/png");
-  //       const imgHeight = (canvas.height * contentWidth) / canvas.width;
-
-  //       if (imgHeight > pageHeight - margin) {
-  //         console.warn(
-  //           "Content for page",
-  //           p + 1,
-  //           "is taller than the PDF page. Consider reducing questionsPerPage."
-  //         );
-  //       }
-  //       pdf.addImage(imgData, "PNG", margin, margin, contentWidth, imgHeight);
-  //     }
-
-  //     // Return the PDF as a Blob
-  //     const pdfBlob = pdf.output("blob");
-  //     document.body.removeChild(tempDiv); // Clean up temp div after use
-  //     return pdfBlob;
-  //   } catch (error) {
-  //     console.error(
-  //       `Error in generatePdfBlobForCourse for ${courseCode}:`,
-  //       error
-  //     );
-  //     // Ensure the tempDiv is removed even if an error occurs
-  //     const tempDiv = document.querySelector("div[style*='-9999px']");
-  //     if (tempDiv) {
-  //       document.body.removeChild(tempDiv);
-  //     }
-  //     throw error;
-  //   }
-  // };
 
   const handleDownloadPdf = async () => {
     setPdfGenerating(true);
     try {
-      // Re-use the existing questionDetails state for single download
       if (
         !selectedAcademicYear ||
         !selectedCourse ||
@@ -786,7 +432,7 @@ function QuestionView() {
         questionDetails,
         selectedCourse
       );
-      saveAs(pdfBlob, `${selectedCourse}.pdf`); // Save the single PDF
+      saveAs(pdfBlob, `${selectedCourse}.pdf`);
     } catch (error) {
       console.error("Error generating single PDF:", error);
       alert("Failed to generate PDF. Please try again.");
@@ -795,10 +441,6 @@ function QuestionView() {
     }
   };
 
-  /**
-   * The main function to trigger the bulk download process.
-   * This function will fetch questions for all courses and then zip them.
-   */
   const handleDownloadAllCourses = async () => {
     if (!selectedAcademicYear || !courseOptions || courseOptions.length === 0) {
       alert("Please select an academic year and ensure courses are loaded.");
@@ -828,13 +470,11 @@ function QuestionView() {
       try {
         console.log(`[Processing]: ${courseLabel}`);
 
-        // --- Step 1: Fetch details for the current course ---
         const combinedCourse = encodeURIComponent(`(${courseCode})`);
         const res = await apiGetRequest(
           `/getQuestion/${year}/${sem}/${combinedCourse}`
         );
 
-        // --- Step 2: Generate PDF Blob if data is valid ---
         if (
           res.success &&
           res.data.question_details &&
@@ -856,7 +496,6 @@ function QuestionView() {
       }
     }
 
-    // --- Step 3: Generate and save the ZIP file ---
     try {
       console.log("Generating ZIP file...");
       const zipBlob = await zip.generateAsync({ type: "blob" });
