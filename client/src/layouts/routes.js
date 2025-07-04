@@ -1,5 +1,5 @@
 import { lazy } from "react";
-const BasicExample = lazy(() => import("page/example/mainpage"));
+const BasicExample = lazy(() => import("page/example/mainpage_LAST"));
 
 
 const routes = {

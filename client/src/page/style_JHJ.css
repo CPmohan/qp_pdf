@@ -1,14 +1,19 @@
+/* style.css */
 /* Overall container for the question paper content */
 .question-paper-container {
   /* No direct border here, the main-qp-table will handle it */
   box-sizing: border-box; /* Include padding and border in the element's total width and height */
-} /* Header Table Styles */
+  overflow: hidden; /* Prevent content from spilling outside this container if something goes wrong */
+}
+
+/* Header Table Styles */
 .qp-header-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 0px;
   table-layout: fixed; /* Ensures header columns are respected */
 }
+
 .header-logo-cell {
   border: 1px solid #666;
   padding: 5px; /* Adjust as needed */
@@ -16,6 +21,12 @@
   text-align: center;
   width: 150px; /* Adjust this width to match the image's logo column width */
 }
+
+.header-logo-cell img {
+  max-width: 100%; /* Ensure logo is responsive within its cell */
+  height: auto;
+}
+
 .header-text-cell {
   border: 1px solid #666;
   border-left: none; /* No left border as it shares with logo cell */
@@ -24,28 +35,35 @@
   text-align: center;
   word-wrap: break-word; /* Wrap long text in header if necessary */
 }
+
 .header-text-content {
   padding: 10px 0; /* Vertical padding within the text cell */
 }
+
 .institute-name {
   font-size: 1.15rem; /* Slightly smaller than text-xl, adjust as per image */
   font-weight: normal; /* As seen in the image */
   margin: 0;
   padding: 2px 0;
 }
+
 .affiliation,
 .address {
   font-size: 0.85rem; /* Smaller for affiliation and address */
   font-weight: normal;
   margin: 0;
   padding: 1px 0;
-} /* Questions Table Styles */
+}
+
+/* Questions Table Styles */
 .qp-questions-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 0px; /* No gap between header and questions table */
   table-layout: fixed; /* <<< KEY FIX #1: Forces columns to respect their widths */
-} /* Common cell styles for all question/answer cells */
+}
+
+/* Common cell styles for all question/answer cells */
 .qp-cell-a-number,
 .qp-cell-sub-q,
 .qp-cell-question-content,
@@ -54,48 +72,65 @@
   padding: 10px; /* Default padding for content */
   vertical-align: top;
   line-height: 1.4;
+  word-wrap: break-word; /* Ensure content within cells wraps */
+  overflow: hidden; /* Hide any overflowing content that somehow escapes */
 }
+
 .qp-cell-a-number {
   width: 60px; /* Fixed width for A1, A2, A3 column */
   text-align: center;
-  font-weight: normal; /* The rowSpan will make its bottom border only appear at the bottom of the answer cell */
+  font-weight: normal;
+  /* The rowSpan will make its bottom border only appear at the bottom of the answer cell */
 }
+
 .qp-cell-sub-q {
   width: 40px; /* Fixed width for (i) column */
   text-align: center;
-  font-weight: normal; /* The rowSpan will make its bottom border only appear at the bottom of the answer cell */
+  font-weight: normal;
+  /* The rowSpan will make its bottom border only appear at the bottom of the answer cell */
 }
+
 .qp-cell-question-content {
   /* This cell's bottom border will be the top border of the answer cell below it */
   border-bottom: none;
   text-align: justify;
-  word-wrap: break-word; /* <<< KEY FIX #2: Wraps long text to prevent overflow */
+  /* width is implicitly 100% minus the other fixed columns */
 }
+
 .qp-cell-answer-content {
-  /* This cell spans the full width of the content area */ /* Its top border connects to the bottom of the question content cell */ /* It needs to explicitly remove its left border if it's visually spanning */ /* Re-add border-left/right if the table structure changes */
+  /* This cell spans the full width of the content area */
+  /* Its top border connects to the bottom of the question content cell */
+  /* It needs to explicitly remove its left border if it's visually spanning */
+  /* Re-add border-left/right if the table structure changes */
   border-left: none; /* The A-number and sub-q cells provide the left border */
   border-right: none; /* The main table's right border covers this */
   text-align: justify;
   padding-top: 5px; /* Reduce padding slightly for answer content */
   font-size: 14px; /* Match content font size */
-  word-wrap: break-word; /* Also apply wrapping to the answer content */
-} /* Specific styles for headings within cells */
+}
+
+/* Specific styles for headings within cells */
 .topic-heading {
   font-weight: bold; /* Keep the "Topic" label bold */
   margin-top: 15px; /* Spacing above "Topic" */
   margin-bottom: 5px;
   font-size: 15px; /* You can adjust this for the "Topic" label itself */
 }
+
 .answer-heading {
   font-weight: bold;
   margin-top: 15px;
   margin-bottom: 5px;
   font-size: 15px;
-} /* Specific styles for the actual topic text (the content of the topic) */ /* This targets the <h2> element with class 'font-medium' within the question content cell */
+}
+
+/* Specific styles for the actual topic text (the content of the topic) */
+/* This targets the <h2> element with class 'font-medium' within the question content cell */
 .qp-cell-question-content .font-medium {
   font-weight: normal !important; /* Set to normal to remove boldness, !important to override */
   font-size: 16px; /* You can change '14px' to any size you prefer (e.g., 12px, 16px, 1em) */
 }
+
 .sanitized-content {
   text-align: justify !important;
   font-family: Arial !important;
@@ -104,15 +139,43 @@
   color: black !important;
   margin-top: 0; /* Remove default margin */
 }
+
+/* Ensure images within sanitized content are responsive */
+.sanitized-content img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block; /* Remove extra space below image */
+  margin: 0 auto; /* Center images */
+}
+
+/* Ensure tables within sanitized content are responsive */
+.sanitized-content table {
+  max-width: 100% !important;
+  width: 100% !important; /* Force tables to take available width */
+  border-collapse: collapse;
+  table-layout: fixed; /* Crucial for controlling column widths within the table */
+}
+
+.sanitized-content table td,
+.sanitized-content table th {
+  word-wrap: break-word;
+  overflow-wrap: break-word; /* Modern equivalent */
+  padding: 5px; /* Add some padding to table cells */
+  border: 1px solid #ccc; /* Add borders to internal table cells for clarity */
+}
+
+
 .answer-text {
   margin-top: 5px; /* Small margin for answer text below "Answer" heading */
 }
+
 .mark-section {
   display: flex;
   justify-content: flex-end;
   width: 100%;
   margin-top: 10px; /* Spacing above marks */
 }
+
 .mark-text {
   font-weight: normal;
   font-size: 15px; /* Match other text size */
