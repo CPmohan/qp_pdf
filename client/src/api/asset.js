@@ -2,11 +2,6 @@ import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8080/api";
 
-/**
- * Uploads a new asset along with its files.
- * @param {FormData} formData – multipart form data containing 'metadata' and file blobs.
- * @returns {Promise<AxiosResponse>} the server response
- */
 export const createAsset = async (formData) => {
   return axios.post(
     `${API_BASE_URL}/assets`,
